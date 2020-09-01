@@ -1,21 +1,59 @@
-import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState, useEffect } from "react";
+import { AsyncStorage } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { AppLoading } from "expo";
+import * as Font from "expo-font";
+import { Asset } from "expo-asset";
+import { InMemoryCache } from "apollo-cache-inmemory";
+import { persistCache } from "apollo-cache-persist";
+import ApolloClient from "apollo-boost";
+import apolloClientOption from "./apollo";
+import { ApolloProvider } from "@apollo/react-hooks";
+import NavController from "./component/NavController";
+import { AuthProvider } from "./AuthContext";
 
 export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+  const [loaded, setLoaded] = useState(false);
+  const [client, setClient] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(null);
+  const preLoad = async () => {
+    try {
+      await Font.loadAsync({
+        ...Ionicons.font,
+      });
+      await Asset.loadAsync([require("./assets/logo.png")]);
+      const cache = new InMemoryCache();
+      await persistCache({
+        cache,
+        storage: AsyncStorage,
+      });
+      const client = new ApolloClient({
+        cache,
+        ...apolloClientOption,
+      });
+      const isLoggedIn = await AsyncStorage.getItem("isLoggedIn");
+      if (!isLoggedIn || isLoggedIn === "false") {
+        setIsLoggedIn(false);
+      } else {
+        setIsLoggedIn(true);
+      }
+      setLoaded(true);
+      setClient(client);
+    } catch (e) {
+      console.log(e);
+    }
+  };
+  useEffect(() => {
+    preLoad();
+  }, []);
+
+  return loaded && client && isLoggedIn !== null ? (
+    <ApolloProvider client={client}>
+      <AuthProvider isLoggedIn={isLoggedIn}>
+        <NavController />
+      </AuthProvider>
+    </ApolloProvider>
+  ) : (
+    <AppLoading />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
